@@ -1,0 +1,10 @@
+{
+  "type": "neoforge:add_spawns",
+  "biomes": "#penguinmod:spawns_penguins",
+  "spawners": {
+    "type": "penguinmod:penguin",
+    "weight": 10,
+    "minCount": 2,
+    "maxCount": 5
+  }
+}
