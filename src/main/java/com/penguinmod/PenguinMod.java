@@ -1,73 +1,53 @@
 package com.penguinmod;
 
 import com.penguinmod.entity.PenguinEntity;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
+import net.fabricmc.fabric.api.biome.v1.BiomeSelectors;
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.SpawnPlacementTypes;
+import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.common.DeferredSpawnEggItem;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
-import net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
-import net.neoforged.neoforge.registries.DeferredItem;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.core.Registry;
+import net.minecraft.tags.TagKey;
 
-/**
- * Penguin Mod - adds a penguin mob that spawns naturally in snowy / icy biomes.
- * Biome spawning itself is data driven, see
- * data/penguinmod/neoforge/biome_modifier/penguin_spawns.json
- */
-@Mod(PenguinMod.MODID)
-public class PenguinMod {
+public class PenguinMod implements ModInitializer {
     public static final String MODID = "penguinmod";
+    public static final ResourceLocation PENGUIN_ID = ResourceLocation.fromNamespaceAndPath(MODID, "penguin");
+    public static final ResourceKey<EntityType<?>> PENGUIN_KEY = ResourceKey.create(Registries.ENTITY_TYPE, PENGUIN_ID);
+    public static final EntityType<PenguinEntity> PENGUIN = Registry.register(
+            BuiltInRegistries.ENTITY_TYPE, PENGUIN_ID,
+            EntityType.Builder.of(PenguinEntity::new, MobCategory.CREATURE)
+                    .sized(0.6F, 1.0F)
+                    .eyeHeight(0.85F)
+                    .clientTrackingRange(8)
+                    .build(PENGUIN_KEY));
+    public static final Item PENGUIN_SPAWN_EGG = Registry.register(
+            BuiltInRegistries.ITEM,
+            ResourceLocation.fromNamespaceAndPath(MODID, "penguin_spawn_egg"),
+            new SpawnEggItem(PENGUIN, new Item.Properties()));
 
-    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
-            DeferredRegister.create(Registries.ENTITY_TYPE, MODID);
-    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
+    private static final TagKey<Biome> PENGUIN_BIOMES =
+            TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath(MODID, "spawns_penguins"));
 
-    public static final DeferredHolder<EntityType<?>, EntityType<PenguinEntity>> PENGUIN =
-            ENTITY_TYPES.register("penguin", () ->
-                    EntityType.Builder.of(PenguinEntity::new, MobCategory.CREATURE)
-                            .sized(0.6F, 1.0F)
-                            .eyeHeight(0.85F)
-                            .clientTrackingRange(8)
-                            .build("penguin"));
-
-    // Spawn egg uses the custom texture, so both tint colours are white (= no tint).
-    public static final DeferredItem<DeferredSpawnEggItem> PENGUIN_SPAWN_EGG =
-            ITEMS.register("penguin_spawn_egg", () ->
-                    new DeferredSpawnEggItem(PENGUIN, 0xFFFFFF, 0xFFFFFF, new Item.Properties()));
-
-    public PenguinMod(IEventBus modEventBus) {
-        ENTITY_TYPES.register(modEventBus);
-        ITEMS.register(modEventBus);
-
-        modEventBus.addListener(this::registerAttributes);
-        modEventBus.addListener(this::registerSpawnPlacements);
-        modEventBus.addListener(this::addToCreativeTabs);
-    }
-
-    private void registerAttributes(EntityAttributeCreationEvent event) {
-        event.put(PENGUIN.get(), PenguinEntity.createAttributes().build());
-    }
-
-    private void registerSpawnPlacements(RegisterSpawnPlacementsEvent event) {
-        event.register(PENGUIN.get(),
-                SpawnPlacementTypes.ON_GROUND,
-                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                PenguinEntity::checkPenguinSpawnRules,
-                RegisterSpawnPlacementsEvent.Operation.OR);
-    }
-
-    private void addToCreativeTabs(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
-            event.accept(PENGUIN_SPAWN_EGG);
-        }
+    @Override
+    public void onInitialize() {
+        FabricDefaultAttributeRegistry.register(PENGUIN, PenguinEntity.createAttributes());
+        SpawnPlacements.register(PENGUIN, SpawnPlacementTypes.ON_GROUND,
+                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, PenguinEntity::checkPenguinSpawnRules);
+        BiomeModifications.addSpawn(BiomeSelectors.tag(PENGUIN_BIOMES), MobCategory.CREATURE, PENGUIN, 10, 2, 5);
+        ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.SPAWN_EGGS)
+                .register(entries -> entries.accept(PENGUIN_SPAWN_EGG));
     }
 }
